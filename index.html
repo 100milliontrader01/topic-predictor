@@ -221,8 +221,9 @@
     </div>
 
     <script>
-        // Use environment key if available (Canvas), else use the input value
-        let currentApiKey = ""; 
+        // API key logic
+        const apiKey = ""; 
+        let currentApiKey = apiKey;
         let appData = { hits: [], flops: [] };
 
         function toggleInfo(show) {
@@ -240,7 +241,6 @@
         }
 
         function init() {
-            // Load app data
             const stored = localStorage.getItem('geminiPredictorData');
             if (stored) { 
                 try { 
@@ -254,11 +254,10 @@
                 } 
             }
 
-            // Load saved API Key for external hosting
             const savedKey = localStorage.getItem('gemini_external_key');
             if (savedKey) {
                 document.getElementById('apiKeyInput').value = savedKey;
-                currentApiKey = savedKey;
+                if (!apiKey) currentApiKey = savedKey;
             }
 
             renderLists();
@@ -269,7 +268,7 @@
             document.getElementById('apiKeyInput').onchange = (e) => {
                 const val = e.target.value.trim();
                 localStorage.setItem('gemini_external_key', val);
-                currentApiKey = val;
+                if (!apiKey) currentApiKey = val;
                 showAlert("API Key updated locally.");
             };
 
@@ -327,28 +326,26 @@
                 });
             }
             if (flopCount) flopCount.innerText = appData.flops.length;
-        
+        }
 
         async function callGemini(prompt) {
-            // Priority: Hardcoded key (Canvas) or user-inputted key (external)
             const activeKey = currentApiKey || ""; 
-            
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${activeKey}`;
             
             const systemPrompt = `You are a strict Content Strategist. Analyze the user's video idea against their history.
             Strictly output JSON with this schema:
             {
-                "verdict": "string (VIRAL POTENTIAL, MODERATE, or HIGH RISK)",
-                "confidence_score": number (0-100),
+                "verdict": "string",
+                "confidence_score": number,
                 "rating_text": "string",
                 "insights": [{"type": "positive"|"negative", "text": "string"}],
-                "suggested_improvement": "string (optional)"
+                "suggested_improvement": "string"
             }`;
 
             let retries = 0;
             const backoff = [1000, 2000, 4000];
 
-            while (retries < 3) {
+            while (retries < 5) {
                 try {
                     const response = await fetch(url, {
                         method: 'POST',
@@ -360,19 +357,16 @@
                         })
                     });
                     
-                    if (response.status === 403 || response.status === 400) {
-                        throw new Error("Invalid API Key or Permissions");
-                    }
+                    if (!response.ok) throw new Error(`API Error: ${response.status}`);
 
                     const data = await response.json();
                     return JSON.parse(data.candidates[0].content.parts[0].text);
                 } catch (e) {
-                    if (e.message.includes("API Key")) throw e;
-                    await new Promise(r => setTimeout(r, backoff[retries]));
+                    if (retries === 4) throw e;
+                    await new Promise(r => setTimeout(r, backoff[retries] || 8000));
                     retries++;
                 }
             }
-            throw new Error("Failed");
         }
 
         async function handleGeminiPrediction() {
@@ -381,7 +375,7 @@
             if (!topic) return;
 
             if (appData.hits.length === 0 && appData.flops.length === 0) {
-                showAlert("Add your history first!", "error");
+                showAlert("Add some training data first!", "error");
                 return;
             }
 
@@ -391,11 +385,11 @@
             loader.classList.remove('hidden');
 
             try {
-                const result = await callGemini(`Topic: "${topic}". Hits: ${appData.hits.join(', ')}. Flops: ${appData.flops.join(', ')}`);
+                const result = await callGemini(`Topic: "${topic}". My Hits: ${appData.hits.join(', ')}. My Flops: ${appData.flops.join(', ')}`);
                 displayResult(result);
             } catch (e) {
                 console.error(e);
-                showAlert(e.message.includes("API Key") ? "Set your API Key at the bottom!" : "Error connecting to AI", "error");
+                showAlert("AI Connection failed. Check your API key.", "error");
             } finally {
                 btnText.innerText = "Predict with AI";
                 loader.classList.add('hidden');
@@ -416,7 +410,6 @@
             ratingEl.innerText = res.rating_text;
             
             const score = res.confidence_score || 0;
-            
             let color = "#ef4444"; 
             if (score >= 40) color = "#eab308"; 
             if (score >= 70) color = "#10b981"; 
@@ -431,9 +424,9 @@
                 </div>
             `).join('');
 
-            if (res.suggested_improvement && score < 80) {
+            if (res.suggested_improvement) {
                 suggestionBox.classList.remove('hidden');
-                suggestionText.innerText = `"${res.suggested_improvement}"`;
+                suggestionText.innerText = res.suggested_improvement;
             } else {
                 suggestionBox.classList.add('hidden');
             }
