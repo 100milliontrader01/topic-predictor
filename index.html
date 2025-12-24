@@ -116,6 +116,10 @@
                         <li><span class="text-red-500">Red (0-39%):</span> High risk, matches Flops.</li>
                     </ul>
                 </div>
+                <div class="pt-4 border-t border-white/10">
+                    <h3 class="text-blue-400 font-semibold mb-1">External Hosting</h3>
+                    <p>To use this outside of Gemini, you must enter your own API Key from Google AI Studio in the input field at the bottom of the page.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -205,10 +209,20 @@
                 <ul id="flopsList" class="space-y-2 overflow-y-auto custom-scrollbar flex-1"></ul>
             </div>
         </div>
+
+        <!-- Footer / API Key Setting -->
+        <footer class="mt-12 text-center pb-8 animate-slide">
+            <div class="inline-flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-full">
+                <label for="apiKeyInput" class="text-xs font-bold text-slate-500 uppercase">External API Key:</label>
+                <input type="password" id="apiKeyInput" class="bg-transparent border-none focus:outline-none text-xs text-white placeholder:text-slate-600 w-48" placeholder="Enter key for local hosting...">
+            </div>
+            <p class="text-[10px] text-slate-600 mt-2">Key is saved only in your browser's local storage.</p>
+        </footer>
     </div>
 
     <script>
-        const apiKey = "";
+        // Use environment key if available (Canvas), else use the input value
+        let currentApiKey = ""; 
         let appData = { hits: [], flops: [] };
 
         function toggleInfo(show) {
@@ -226,6 +240,7 @@
         }
 
         function init() {
+            // Load app data
             const stored = localStorage.getItem('geminiPredictorData');
             if (stored) { 
                 try { 
@@ -238,16 +253,25 @@
                     appData = { hits: [], flops: [] };
                 } 
             }
+
+            // Load saved API Key for external hosting
+            const savedKey = localStorage.getItem('gemini_external_key');
+            if (savedKey) {
+                document.getElementById('apiKeyInput').value = savedKey;
+                currentApiKey = savedKey;
+            }
+
             renderLists();
             
-            const pBtn = document.getElementById('predictBtn');
-            if (pBtn) pBtn.onclick = handleGeminiPrediction;
-
-            const hitBtn = document.getElementById('addHitBtn');
-            if (hitBtn) hitBtn.onclick = () => addTopic('hits');
-
-            const flopBtn = document.getElementById('addFlopBtn');
-            if (flopBtn) flopBtn.onclick = () => addTopic('flops');
+            document.getElementById('predictBtn').onclick = handleGeminiPrediction;
+            document.getElementById('addHitBtn').onclick = () => addTopic('hits');
+            document.getElementById('addFlopBtn').onclick = () => addTopic('flops');
+            document.getElementById('apiKeyInput').onchange = (e) => {
+                const val = e.target.value.trim();
+                localStorage.setItem('gemini_external_key', val);
+                currentApiKey = val;
+                showAlert("API Key updated locally.");
+            };
 
             document.getElementById('hitEntry').onkeypress = e => { if(e.key === 'Enter') addTopic('hits'); };
             document.getElementById('flopEntry').onkeypress = e => { if(e.key === 'Enter') addTopic('flops'); };
@@ -278,7 +302,6 @@
         };
 
         function renderLists() {
-            // Update Hits
             const hitsList = document.getElementById('hitsList');
             const hitCount = document.getElementById('hitCount');
             if (hitsList) {
@@ -292,7 +315,6 @@
             }
             if (hitCount) hitCount.innerText = appData.hits.length;
 
-            // Update Flops
             const flopsList = document.getElementById('flopsList');
             const flopCount = document.getElementById('flopCount');
             if (flopsList) {
@@ -305,26 +327,23 @@
                 });
             }
             if (flopCount) flopCount.innerText = appData.flops.length;
-        }
+        
 
         async function callGemini(prompt) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            // Priority: Hardcoded key (Canvas) or user-inputted key (external)
+            const activeKey = currentApiKey || ""; 
             
-            // IMPROVED SYSTEM PROMPT: Now asks for 'suggested_improvement'
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${activeKey}`;
+            
             const systemPrompt = `You are a strict Content Strategist. Analyze the user's video idea against their history.
-            
             Strictly output JSON with this schema:
             {
                 "verdict": "string (VIRAL POTENTIAL, MODERATE, or HIGH RISK)",
                 "confidence_score": number (0-100),
-                "rating_text": "string (e.g. 8.5/10)",
+                "rating_text": "string",
                 "insights": [{"type": "positive"|"negative", "text": "string"}],
-                "suggested_improvement": "string (optional: if score < 80, provide a rewritten title that matches their 'Hit' style)"
-            }
-            
-            If the idea matches 'Hits', score > 70.
-            If the idea matches 'Flops', score < 40.
-            If mixed/uncertain, score 40-70.`;
+                "suggested_improvement": "string (optional)"
+            }`;
 
             let retries = 0;
             const backoff = [1000, 2000, 4000];
@@ -337,14 +356,18 @@
                         body: JSON.stringify({
                             contents: [{ parts: [{ text: prompt }] }],
                             systemInstruction: { parts: [{ text: systemPrompt }] },
-                            generationConfig: { 
-                                responseMimeType: "application/json"
-                            }
+                            generationConfig: { responseMimeType: "application/json" }
                         })
                     });
+                    
+                    if (response.status === 403 || response.status === 400) {
+                        throw new Error("Invalid API Key or Permissions");
+                    }
+
                     const data = await response.json();
                     return JSON.parse(data.candidates[0].content.parts[0].text);
                 } catch (e) {
+                    if (e.message.includes("API Key")) throw e;
                     await new Promise(r => setTimeout(r, backoff[retries]));
                     retries++;
                 }
@@ -372,7 +395,7 @@
                 displayResult(result);
             } catch (e) {
                 console.error(e);
-                showAlert("Error connecting to AI", "error");
+                showAlert(e.message.includes("API Key") ? "Set your API Key at the bottom!" : "Error connecting to AI", "error");
             } finally {
                 btnText.innerText = "Predict with AI";
                 loader.classList.add('hidden');
@@ -394,23 +417,20 @@
             
             const score = res.confidence_score || 0;
             
-            // COLOR LOGIC
-            let color = "#ef4444"; // Red (< 40)
-            if (score >= 40) color = "#eab308"; // Yellow (40-70)
-            if (score >= 70) color = "#10b981"; // Green (>= 70)
+            let color = "#ef4444"; 
+            if (score >= 40) color = "#eab308"; 
+            if (score >= 70) color = "#10b981"; 
             
             progress.style.backgroundColor = color;
             progress.style.width = '0%';
             setTimeout(() => { progress.style.width = score + '%'; }, 100);
 
-            // INSIGHTS
             insightsList.innerHTML = (res.insights || []).map(i => `
                 <div class="insight-card ${i.type === 'positive' ? 'positive' : 'negative'}">
                     <p class="text-sm text-slate-200">${i.text}</p>
                 </div>
             `).join('');
 
-            // SUGGESTION LOGIC
             if (res.suggested_improvement && score < 80) {
                 suggestionBox.classList.remove('hidden');
                 suggestionText.innerText = `"${res.suggested_improvement}"`;
