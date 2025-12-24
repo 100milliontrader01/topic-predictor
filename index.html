@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hit or Flop? | Topic Predictor</title>
+    <title>Hit or Flop? | Gemini AI Predictor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
@@ -24,267 +24,404 @@
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
 
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide { animation: slideUp 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .insight-card {
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 3px solid transparent;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 10px;
+        .insight-card.positive { border-left-color: #10b981; background: rgba(16, 185, 129, 0.05); }
+        .insight-card.negative { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
+        
+        .suggestion-box {
+            background: linear-gradient(to right, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1));
+            border: 1px solid rgba(99, 102, 241, 0.2);
         }
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #FFF;
+            border-bottom-color: transparent;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #customAlert {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            padding: 1rem 2rem;
+            border-radius: 12px;
+            background: #1e293b;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        #infoModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            animation: fadeIn 0.2s ease-out;
         }
 
-        .animate-slide {
-            animation: slideUp 0.4s ease-out forwards;
-        }
+        @keyframes slideDown { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
     </style>
 </head>
 <body class="text-slate-200 p-4 md:p-8">
 
+    <div id="customAlert" class="text-sm font-medium"></div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" onclick="toggleInfo(false)">
+        <div class="glass max-w-lg w-full p-8 rounded-2xl relative" onclick="event.stopPropagation()">
+            <button onclick="toggleInfo(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+            <h2 class="text-2xl font-bold mb-4 text-white">How it Works</h2>
+            <div class="space-y-4 text-sm text-slate-300 leading-relaxed">
+                <div>
+                    <h3 class="text-emerald-400 font-semibold mb-1">1. The Training Phase</h3>
+                    <p>When you add titles to Hits and Flops, they are saved locally. This creates a "style profile" unique to your audience.</p>
+                </div>
+                <div>
+                    <h3 class="text-purple-400 font-semibold mb-1">2. The Gemini Brain</h3>
+                    <p>The AI compares your new idea against your history to identify patterns (e.g., specific keywords, formats, or tones that succeed for you).</p>
+                </div>
+                <div>
+                    <h3 class="text-yellow-400 font-semibold mb-1">3. Scoring Logic</h3>
+                    <ul class="list-disc pl-4 space-y-1 mt-1 text-slate-400">
+                        <li><span class="text-emerald-500">Green (70%+):</span> Strong match with Hits.</li>
+                        <li><span class="text-yellow-500">Yellow (40-69%):</span> Uncertain or mixed signals.</li>
+                        <li><span class="text-red-500">Red (0-39%):</span> High risk, matches Flops.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="max-w-5xl mx-auto">
-        <!-- Header -->
-        <header class="text-center mb-12 animate-slide">
+        <header class="text-center mb-12 animate-slide relative">
+            <button onclick="toggleInfo(true)" class="absolute right-0 top-0 md:top-2 text-slate-500 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
             <h1 class="text-5xl font-extrabold tracking-tight mb-2 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
                 Hit or Flop?
             </h1>
-            <p class="text-slate-400 font-medium text-lg">Predict your next topic performance using your historical data.</p>
+            <p class="text-slate-400 font-medium text-lg">Powered by Gemini 2.5 Intelligence</p>
         </header>
 
-        <!-- Predictor Main Section -->
-        <section class="mb-12 animate-slide" style="animation-delay: 0.1s;">
-            <div class="glass rounded-3xl p-8 max-w-2xl mx-auto border-t border-white/20">
+        <section class="mb-12 animate-slide">
+            <div class="glass rounded-3xl p-8 max-w-3xl mx-auto border-t border-white/20">
                 <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
-                    <span class="text-purple-400">✨</span> New Topic Predictor
+                    <span class="text-purple-400">✨</span> Gemini Thinking Model
                 </h2>
                 <div class="flex flex-col md:flex-row gap-4">
                     <input type="text" id="predictInput" 
                         class="flex-1 bg-white/5 border border-white/10 rounded-xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all text-lg" 
-                        placeholder="What's your new idea?">
+                        placeholder="Enter your video title or idea...">
                     <button id="predictBtn" 
-                        class="bg-white text-slate-900 font-bold px-8 py-4 rounded-xl hover:bg-purple-100 transition-all active:scale-95 whitespace-nowrap">
-                        Analyze Topic
+                        class="bg-white text-slate-900 font-bold px-8 py-4 rounded-xl hover:bg-purple-100 transition-all active:scale-95 flex items-center justify-center gap-2 min-w-[180px]">
+                        <span id="btnText">Predict with AI</span>
+                        <span id="btnLoader" class="loader hidden"></span>
                     </button>
                 </div>
                 
-                <div id="predictionResult" class="hidden mt-8 p-6 rounded-2xl border transition-all duration-500">
+                <div id="predictionResult" class="hidden mt-8 p-6 rounded-2xl border transition-all duration-500 glass">
                     <div id="resultContent" class="flex flex-col items-center text-center">
-                        <span id="resultLabel" class="text-xs font-bold uppercase tracking-widest mb-1">Prediction Result</span>
+                        <span class="text-xs font-bold uppercase tracking-widest mb-1 text-slate-400">Gemini Verdict</span>
                         <h3 id="resultVerdict" class="text-3xl font-black mb-2"></h3>
-                        <div id="scoreBar" class="w-full h-2 bg-white/10 rounded-full mt-4 overflow-hidden">
-                            <div id="scoreProgress" class="h-full w-0 transition-all duration-1000"></div>
+                        <div class="w-full h-3 bg-white/10 rounded-full mt-4 overflow-hidden mb-2">
+                            <div id="scoreProgress" class="h-full w-0 transition-all duration-700 ease-out"></div>
                         </div>
-                        <p id="resultRating" class="mt-3 text-lg font-medium"></p>
+                        <p id="resultRating" class="mt-2 text-lg font-bold"></p>
+
+                        <!-- AI Suggestion Box -->
+                        <div id="aiSuggestion" class="hidden mt-6 w-full suggestion-box rounded-xl p-4 text-left animate-slide">
+                            <div class="flex items-start gap-3">
+                                <span class="text-xl">💡</span>
+                                <div>
+                                    <p class="text-xs font-bold uppercase text-indigo-300 mb-1">AI Suggestion</p>
+                                    <p id="suggestionText" class="text-white font-medium italic"></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-8 w-full text-left space-y-4">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-tighter">Strategic Insights</h4>
+                            <div id="insightsList"></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Management Section -->
-        <div class="grid md:grid-cols-2 gap-8 animate-slide" style="animation-delay: 0.2s;">
-            
-            <!-- Hits List -->
+        <div class="grid md:grid-cols-2 gap-8 animate-slide">
+            <!-- Hits -->
             <div class="glass rounded-3xl p-6 flex flex-col h-[500px]">
                 <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold text-emerald-400">🔥 Hit Library</h3>
-                    <span id="hitCount" class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-md font-mono">0 Items</span>
+                    <h3 class="text-xl font-bold text-emerald-400">🔥 Training: Hits</h3>
+                    <span id="hitCount" class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-md font-mono">0</span>
                 </div>
                 <div class="flex gap-2 mb-4">
-                    <input type="text" id="hitEntry" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Add a winner...">
-                    <button id="addHitBtn" class="bg-emerald-500 hover:bg-emerald-400 text-white p-2 rounded-lg transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg>
-                    </button>
+                    <input type="text" id="hitEntry" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-emerald-500" placeholder="Add successful video...">
+                    <button id="addHitBtn" class="bg-emerald-500 hover:bg-emerald-400 text-white p-2 rounded-lg">+</button>
                 </div>
-                <ul id="hitsList" class="space-y-2 overflow-y-auto custom-scrollbar flex-1 pr-2"></ul>
+                <ul id="hitsList" class="space-y-2 overflow-y-auto custom-scrollbar flex-1"></ul>
             </div>
 
-            <!-- Flops List -->
+            <!-- Flops -->
             <div class="glass rounded-3xl p-6 flex flex-col h-[500px]">
                 <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold text-red-400">💀 Flop Library</h3>
-                    <span id="flopCount" class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-md font-mono">0 Items</span>
+                    <h3 class="text-xl font-bold text-red-400">💀 Training: Flops</h3>
+                    <span id="flopCount" class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-md font-mono">0</span>
                 </div>
                 <div class="flex gap-2 mb-4">
-                    <input type="text" id="flopEntry" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-red-500" placeholder="Add a failure...">
-                    <button id="addFlopBtn" class="bg-red-500 hover:bg-red-400 text-white p-2 rounded-lg transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"></path></svg>
-                    </button>
+                    <input type="text" id="flopEntry" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-red-500" placeholder="Add unsuccessful video...">
+                    <button id="addFlopBtn" class="bg-red-500 hover:bg-red-400 text-white p-2 rounded-lg">+</button>
                 </div>
-                <ul id="flopsList" class="space-y-2 overflow-y-auto custom-scrollbar flex-1 pr-2"></ul>
+                <ul id="flopsList" class="space-y-2 overflow-y-auto custom-scrollbar flex-1"></ul>
             </div>
-
         </div>
-
-        <footer class="mt-12 text-center text-slate-500 text-sm">
-            <p>Topics are stored locally in your browser cache.</p>
-        </footer>
     </div>
 
     <script>
-        // State Management
-        let appData = {
-            hits: [],
-            flops: []
-        };
+        const apiKey = "";
+        let appData = { hits: [], flops: [] };
 
-        // Initialize from localStorage
+        function toggleInfo(show) {
+            const modal = document.getElementById('infoModal');
+            modal.style.display = show ? 'flex' : 'none';
+        }
+
+        function showAlert(msg, type = 'info') {
+            const el = document.getElementById('customAlert');
+            if (!el) return;
+            el.innerText = msg;
+            el.style.display = 'block';
+            el.style.borderColor = type === 'error' ? '#ef4444' : 'rgba(255,255,255,0.1)';
+            setTimeout(() => { el.style.display = 'none'; }, 3000);
+        }
+
         function init() {
-            const stored = localStorage.getItem('topicPredictorData');
-            if (stored) {
-                try {
-                    appData = JSON.parse(stored);
+            const stored = localStorage.getItem('geminiPredictorData');
+            if (stored) { 
+                try { 
+                    const parsed = JSON.parse(stored);
+                    appData = {
+                        hits: Array.isArray(parsed.hits) ? parsed.hits : [],
+                        flops: Array.isArray(parsed.flops) ? parsed.flops : []
+                    };
                 } catch (e) {
-                    console.error("Failed to parse stored data", e);
-                }
+                    appData = { hits: [], flops: [] };
+                } 
             }
             renderLists();
-            setupEventListeners();
+            
+            const pBtn = document.getElementById('predictBtn');
+            if (pBtn) pBtn.onclick = handleGeminiPrediction;
+
+            const hitBtn = document.getElementById('addHitBtn');
+            if (hitBtn) hitBtn.onclick = () => addTopic('hits');
+
+            const flopBtn = document.getElementById('addFlopBtn');
+            if (flopBtn) flopBtn.onclick = () => addTopic('flops');
+
+            document.getElementById('hitEntry').onkeypress = e => { if(e.key === 'Enter') addTopic('hits'); };
+            document.getElementById('flopEntry').onkeypress = e => { if(e.key === 'Enter') addTopic('flops'); };
         }
 
-        function setupEventListeners() {
-            // Button Click Listeners
-            document.getElementById('predictBtn').addEventListener('click', handlePrediction);
-            document.getElementById('addHitBtn').addEventListener('click', () => addTopic('hits'));
-            document.getElementById('addFlopBtn').addEventListener('click', () => addTopic('flops'));
-
-            // Enter key listeners
-            document.getElementById('predictInput').addEventListener('keypress', (e) => { if(e.key === 'Enter') handlePrediction(); });
-            document.getElementById('hitEntry').addEventListener('keypress', (e) => { if(e.key === 'Enter') addTopic('hits'); });
-            document.getElementById('flopEntry').addEventListener('keypress', (e) => { if(e.key === 'Enter') addTopic('flops'); });
-        }
-
-        // Save to localStorage
         function save() {
-            localStorage.setItem('topicPredictorData', JSON.stringify(appData));
+            localStorage.setItem('geminiPredictorData', JSON.stringify(appData));
             renderLists();
         }
 
         function addTopic(type) {
-            const input = document.getElementById(type === 'hits' ? 'hitEntry' : 'flopEntry');
+            const inputId = type === 'hits' ? 'hitEntry' : 'flopEntry';
+            const input = document.getElementById(inputId);
             if (!input) return;
-            const value = input.value.trim().toLowerCase();
-            
-            if (value && !appData[type].includes(value)) {
-                appData[type].unshift(value);
+            const val = input.value.trim();
+            if (val) {
+                appData[type].unshift(val);
                 input.value = '';
                 save();
             }
         }
 
-        window.removeTopic = function(type, index) {
-            appData[type].splice(index, 1);
-            save();
+        window.removeTopic = (type, index) => { 
+            if (appData[type]) {
+                appData[type].splice(index, 1); 
+                save(); 
+            }
         };
 
         function renderLists() {
-            const types = ['hits', 'flops'];
-            types.forEach(type => {
-                const listEl = document.getElementById(`${type}List`);
-                const countEl = document.getElementById(type === 'hits' ? 'hitCount' : 'flopCount');
-                
-                if (!listEl || !countEl) return;
-
-                listEl.innerHTML = '';
-                countEl.innerText = `${appData[type].length} Items`;
-
-                appData[type].forEach((topic, index) => {
+            // Update Hits
+            const hitsList = document.getElementById('hitsList');
+            const hitCount = document.getElementById('hitCount');
+            if (hitsList) {
+                hitsList.innerHTML = '';
+                appData.hits.forEach((topic, i) => {
                     const li = document.createElement('li');
-                    li.className = 'flex justify-between items-center bg-white/5 px-4 py-3 rounded-xl border border-white/5 hover:border-white/10 transition-all group';
-                    li.innerHTML = `
-                        <span class="capitalize font-medium text-slate-300">${topic}</span>
-                        <button onclick="removeTopic('${type}', ${index})" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"></path></svg>
-                        </button>
-                    `;
-                    listEl.appendChild(li);
+                    li.className = 'flex justify-between items-center bg-white/5 px-4 py-3 rounded-xl border border-white/5 group mb-2 animate-slide';
+                    li.innerHTML = `<span class="text-sm truncate">${topic}</span><button onclick="removeTopic('hits', ${i})" class="text-slate-500 hover:text-red-400 transition-colors px-2">×</button>`;
+                    hitsList.appendChild(li);
                 });
-            });
+            }
+            if (hitCount) hitCount.innerText = appData.hits.length;
+
+            // Update Flops
+            const flopsList = document.getElementById('flopsList');
+            const flopCount = document.getElementById('flopCount');
+            if (flopsList) {
+                flopsList.innerHTML = '';
+                appData.flops.forEach((topic, i) => {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-center bg-white/5 px-4 py-3 rounded-xl border border-white/5 group mb-2 animate-slide';
+                    li.innerHTML = `<span class="text-sm truncate">${topic}</span><button onclick="removeTopic('flops', ${i})" class="text-slate-500 hover:text-red-400 transition-colors px-2">×</button>`;
+                    flopsList.appendChild(li);
+                });
+            }
+            if (flopCount) flopCount.innerText = appData.flops.length;
         }
 
-        function calculateSimilarity(str1, str2) {
-            const words1 = str1.toLowerCase().split(/\W+/);
-            const words2 = str2.toLowerCase().split(/\W+/);
-            const intersection = words1.filter(word => words2.includes(word) && word.length > 2);
-            return intersection.length;
+        async function callGemini(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            // IMPROVED SYSTEM PROMPT: Now asks for 'suggested_improvement'
+            const systemPrompt = `You are a strict Content Strategist. Analyze the user's video idea against their history.
+            
+            Strictly output JSON with this schema:
+            {
+                "verdict": "string (VIRAL POTENTIAL, MODERATE, or HIGH RISK)",
+                "confidence_score": number (0-100),
+                "rating_text": "string (e.g. 8.5/10)",
+                "insights": [{"type": "positive"|"negative", "text": "string"}],
+                "suggested_improvement": "string (optional: if score < 80, provide a rewritten title that matches their 'Hit' style)"
+            }
+            
+            If the idea matches 'Hits', score > 70.
+            If the idea matches 'Flops', score < 40.
+            If mixed/uncertain, score 40-70.`;
+
+            let retries = 0;
+            const backoff = [1000, 2000, 4000];
+
+            while (retries < 3) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            systemInstruction: { parts: [{ text: systemPrompt }] },
+                            generationConfig: { 
+                                responseMimeType: "application/json"
+                            }
+                        })
+                    });
+                    const data = await response.json();
+                    return JSON.parse(data.candidates[0].content.parts[0].text);
+                } catch (e) {
+                    await new Promise(r => setTimeout(r, backoff[retries]));
+                    retries++;
+                }
+            }
+            throw new Error("Failed");
         }
 
-        function handlePrediction() {
+        async function handleGeminiPrediction() {
             const input = document.getElementById('predictInput');
-            const topic = input.value.trim().toLowerCase();
+            const topic = input?.value.trim();
             if (!topic) return;
 
-            let hitScore = 0;
-            let flopScore = 0;
-
-            appData.hits.forEach(h => {
-                if (topic.includes(h) || h.includes(topic)) hitScore += 3;
-                hitScore += calculateSimilarity(topic, h);
-            });
-
-            appData.flops.forEach(f => {
-                if (topic.includes(f) || f.includes(topic)) flopScore += 3;
-                flopScore += calculateSimilarity(topic, f);
-            });
-
             if (appData.hits.length === 0 && appData.flops.length === 0) {
-                showResult("DATA REQUIRED", "Add topics to your libraries first.", 50, "bg-slate-400", "border-slate-500/30 text-slate-400");
+                showAlert("Add your history first!", "error");
                 return;
             }
 
-            let total = hitScore + flopScore;
-            let percentage = total === 0 ? 50 : (hitScore / total) * 100;
-            
-            let verdict = "";
-            let colorClass = "";
-            let borderClass = "";
-            let ratingText = `Rating: ${(percentage/10).toFixed(1)}/10`;
+            const btnText = document.getElementById('btnText');
+            const loader = document.getElementById('btnLoader');
+            btnText.innerText = "Thinking...";
+            loader.classList.remove('hidden');
 
-            if (percentage > 65) {
-                verdict = "DEFINITE HIT";
-                colorClass = "bg-emerald-500";
-                borderClass = "border-emerald-500/30 text-emerald-400";
-            } else if (percentage < 35) {
-                verdict = "TOTAL FLOP";
-                colorClass = "bg-red-500";
-                borderClass = "border-red-500/30 text-red-400";
-            } else {
-                verdict = "COULD GO EITHER WAY";
-                colorClass = "bg-yellow-500";
-                borderClass = "border-yellow-500/30 text-yellow-400";
+            try {
+                const result = await callGemini(`Topic: "${topic}". Hits: ${appData.hits.join(', ')}. Flops: ${appData.flops.join(', ')}`);
+                displayResult(result);
+            } catch (e) {
+                console.error(e);
+                showAlert("Error connecting to AI", "error");
+            } finally {
+                btnText.innerText = "Predict with AI";
+                loader.classList.add('hidden');
             }
-
-            showResult(verdict, ratingText, percentage, colorClass, borderClass);
         }
 
-        function showResult(verdict, rating, percent, color, border) {
+        function displayResult(res) {
             const panel = document.getElementById('predictionResult');
             const verdictEl = document.getElementById('resultVerdict');
             const ratingEl = document.getElementById('resultRating');
             const progress = document.getElementById('scoreProgress');
+            const insightsList = document.getElementById('insightsList');
+            const suggestionBox = document.getElementById('aiSuggestion');
+            const suggestionText = document.getElementById('suggestionText');
 
-            if (!panel || !verdictEl || !ratingEl || !progress) return;
-
-            panel.className = `mt-8 p-6 rounded-2xl border transition-all duration-500 glass animate-slide ${border}`;
             panel.classList.remove('hidden');
+            verdictEl.innerText = res.verdict;
+            ratingEl.innerText = res.rating_text;
             
-            verdictEl.innerText = verdict;
-            ratingEl.innerText = rating;
+            const score = res.confidence_score || 0;
             
-            progress.className = `h-full transition-all duration-1000 ${color}`;
-            // Reset width briefly to trigger transition
+            // COLOR LOGIC
+            let color = "#ef4444"; // Red (< 40)
+            if (score >= 40) color = "#eab308"; // Yellow (40-70)
+            if (score >= 70) color = "#10b981"; // Green (>= 70)
+            
+            progress.style.backgroundColor = color;
             progress.style.width = '0%';
-            setTimeout(() => {
-                progress.style.width = `${percent}%`;
-            }, 50);
+            setTimeout(() => { progress.style.width = score + '%'; }, 100);
+
+            // INSIGHTS
+            insightsList.innerHTML = (res.insights || []).map(i => `
+                <div class="insight-card ${i.type === 'positive' ? 'positive' : 'negative'}">
+                    <p class="text-sm text-slate-200">${i.text}</p>
+                </div>
+            `).join('');
+
+            // SUGGESTION LOGIC
+            if (res.suggested_improvement && score < 80) {
+                suggestionBox.classList.remove('hidden');
+                suggestionText.innerText = `"${res.suggested_improvement}"`;
+            } else {
+                suggestionBox.classList.add('hidden');
+            }
+            
+            panel.scrollIntoView({ behavior: 'smooth' });
         }
 
-        // Ensure DOM is fully loaded before initialization
-        window.addEventListener('DOMContentLoaded', init);
+        window.onload = init;
     </script>
 </body>
 </html>
