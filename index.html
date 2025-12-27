@@ -59,6 +59,13 @@
         }
         @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+        /* SVG Circle Animation */
+        .gauge-circle {
+            transition: stroke-dashoffset 1s ease-out, color 0.5s ease;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+
         #customAlert {
             display: none;
             position: fixed;
@@ -97,7 +104,7 @@
     <!-- Info Modal -->
     <div id="infoModal" onclick="toggleInfo(false)">
         <div class="glass max-w-lg w-full p-8 rounded-2xl relative" onclick="event.stopPropagation()">
-            <button onclick="toggleInfo(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white">✕</button>
+            <button onclick="toggleInfo(false)" class="absolute top-4 right-4 text-slate-400 hover:text-white">Close</button>
             <h2 class="text-2xl font-bold mb-4 text-white">How it Works</h2>
             <div class="space-y-4 text-sm text-slate-300 leading-relaxed">
                 <div>
@@ -140,7 +147,7 @@
         <section class="mb-12 animate-slide">
             <div class="glass rounded-3xl p-8 max-w-3xl mx-auto border-t border-white/20">
                 <h2 class="text-xl font-semibold mb-6 flex items-center gap-2">
-                    <span class="text-purple-400">✨</span> Gemini Thinking Model
+                    <span class="text-purple-400"></span> Gemini Thinking Model
                 </h2>
                 <div class="flex flex-col md:flex-row gap-4">
                     <input type="text" id="predictInput" 
@@ -155,19 +162,28 @@
                 
                 <div id="predictionResult" class="hidden mt-8 p-6 rounded-2xl border transition-all duration-500 glass">
                     <div id="resultContent" class="flex flex-col items-center text-center">
-                        <span class="text-xs font-bold uppercase tracking-widest mb-1 text-slate-400">Gemini Verdict</span>
-                        <h3 id="resultVerdict" class="text-3xl font-black mb-2"></h3>
-                        <div class="w-full h-3 bg-white/10 rounded-full mt-4 overflow-hidden mb-2">
-                            <div id="scoreProgress" class="h-full w-0 transition-all duration-700 ease-out"></div>
+                        <span class="text-xs font-bold uppercase tracking-widest mb-4 text-slate-400">Gemini Verdict</span>
+                        <h3 id="resultVerdict" class="text-3xl font-black mb-6"></h3>
+                        
+                        <!-- Radial Gauge -->
+                        <div class="relative w-40 h-40 mb-2">
+                            <svg class="w-full h-full" viewBox="0 0 128 128">
+                                <!-- Background Circle -->
+                                <circle cx="64" cy="64" r="56" stroke="rgba(255,255,255,0.1)" stroke-width="10" fill="transparent" />
+                                <!-- Progress Circle -->
+                                <circle id="scoreCircle" class="gauge-circle" cx="64" cy="64" r="56" stroke="currentColor" stroke-width="10" fill="transparent" stroke-dasharray="351.86" stroke-dashoffset="351.86" stroke-linecap="round" />
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span id="gaugeValue" class="text-4xl font-black text-white">0</span>
+                                <span class="text-xs text-slate-400 font-bold uppercase mt-1">/ 10</span>
+                            </div>
                         </div>
-                        <p id="resultRating" class="mt-2 text-lg font-bold"></p>
 
                         <!-- AI Suggestion Box -->
                         <div id="aiSuggestion" class="hidden mt-6 w-full suggestion-box rounded-xl p-4 text-left animate-slide">
                             <div class="flex items-start gap-3">
-                                <span class="text-xl">💡</span>
+                                <span class="text-xl font-bold text-indigo-400">Suggestion:</span>
                                 <div>
-                                    <p class="text-xs font-bold uppercase text-indigo-300 mb-1">AI Suggestion</p>
                                     <p id="suggestionText" class="text-white font-medium italic"></p>
                                 </div>
                             </div>
@@ -186,12 +202,12 @@
             <!-- Hits -->
             <div class="glass rounded-3xl p-6 flex flex-col h-[500px]">
                 <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold text-emerald-400">🔥 Training: Hits</h3>
+                    <h3 class="text-xl font-bold text-emerald-400">Training: Hits</h3>
                     <span id="hitCount" class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-md font-mono">0</span>
                 </div>
                 <div class="flex gap-2 mb-4">
                     <input type="text" id="hitEntry" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-emerald-500" placeholder="Add successful video...">
-                    <button id="addHitBtn" class="bg-emerald-500 hover:bg-emerald-400 text-white p-2 rounded-lg">+</button>
+                    <button id="addHitBtn" class="bg-emerald-500 hover:bg-emerald-400 text-white p-2 rounded-lg font-bold">Add</button>
                 </div>
                 <ul id="hitsList" class="space-y-2 overflow-y-auto custom-scrollbar flex-1"></ul>
             </div>
@@ -199,12 +215,12 @@
             <!-- Flops -->
             <div class="glass rounded-3xl p-6 flex flex-col h-[500px]">
                 <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-xl font-bold text-red-400">💀 Training: Flops</h3>
+                    <h3 class="text-xl font-bold text-red-400">Training: Flops</h3>
                     <span id="flopCount" class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-md font-mono">0</span>
                 </div>
                 <div class="flex gap-2 mb-4">
                     <input type="text" id="flopEntry" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-sm focus:ring-1 focus:ring-red-500" placeholder="Add unsuccessful video...">
-                    <button id="addFlopBtn" class="bg-red-500 hover:bg-red-400 text-white p-2 rounded-lg">+</button>
+                    <button id="addFlopBtn" class="bg-red-500 hover:bg-red-400 text-white p-2 rounded-lg font-bold">Add</button>
                 </div>
                 <ul id="flopsList" class="space-y-2 overflow-y-auto custom-scrollbar flex-1"></ul>
             </div>
@@ -308,7 +324,7 @@
                 appData.hits.forEach((topic, i) => {
                     const li = document.createElement('li');
                     li.className = 'flex justify-between items-center bg-white/5 px-4 py-3 rounded-xl border border-white/5 group mb-2 animate-slide';
-                    li.innerHTML = `<span class="text-sm truncate">${topic}</span><button onclick="removeTopic('hits', ${i})" class="text-slate-500 hover:text-red-400 transition-colors px-2">×</button>`;
+                    li.innerHTML = `<span class="text-sm truncate">${topic}</span><button onclick="removeTopic('hits', ${i})" class="text-slate-500 hover:text-red-400 transition-colors px-2 font-bold">Remove</button>`;
                     hitsList.appendChild(li);
                 });
             }
@@ -321,7 +337,7 @@
                 appData.flops.forEach((topic, i) => {
                     const li = document.createElement('li');
                     li.className = 'flex justify-between items-center bg-white/5 px-4 py-3 rounded-xl border border-white/5 group mb-2 animate-slide';
-                    li.innerHTML = `<span class="text-sm truncate">${topic}</span><button onclick="removeTopic('flops', ${i})" class="text-slate-500 hover:text-red-400 transition-colors px-2">×</button>`;
+                    li.innerHTML = `<span class="text-sm truncate">${topic}</span><button onclick="removeTopic('flops', ${i})" class="text-slate-500 hover:text-red-400 transition-colors px-2 font-bold">Remove</button>`;
                     flopsList.appendChild(li);
                 });
             }
@@ -337,7 +353,7 @@
             {
                 "verdict": "string",
                 "confidence_score": number,
-                "rating_text": "string",
+                "rating_text": "string (strictly in format: '8.5/10')",
                 "insights": [{"type": "positive"|"negative", "text": "string"}],
                 "suggested_improvement": "string"
             }`;
@@ -399,24 +415,52 @@
         function displayResult(res) {
             const panel = document.getElementById('predictionResult');
             const verdictEl = document.getElementById('resultVerdict');
-            const ratingEl = document.getElementById('resultRating');
-            const progress = document.getElementById('scoreProgress');
+            const gaugeValueEl = document.getElementById('gaugeValue');
+            const circle = document.getElementById('scoreCircle');
             const insightsList = document.getElementById('insightsList');
             const suggestionBox = document.getElementById('aiSuggestion');
             const suggestionText = document.getElementById('suggestionText');
 
+            // Reset UI state before showing new result
             panel.classList.remove('hidden');
+            
+            // Set initial state for animation
+            const circumference = 351.86; // 2 * pi * 56
+            circle.style.strokeDashoffset = circumference;
+            
             verdictEl.innerText = res.verdict;
-            ratingEl.innerText = res.rating_text;
             
-            const score = res.confidence_score || 0;
-            let color = "#ef4444"; 
-            if (score >= 40) color = "#eab308"; 
-            if (score >= 70) color = "#10b981"; 
+            // Parse rating (e.g., "8.5/10") or fallback to score
+            let displayScore = "0.0";
+            let score = Math.max(0, Math.min(100, res.confidence_score || 0));
+
+            // Try to extract numeric part from rating_text like "8.5/10"
+            const ratingMatch = (res.rating_text || "").match(/([\d\.]+)/);
+            if (ratingMatch) {
+                displayScore = ratingMatch[1];
+                // Recalculate score percentage if needed based on the text
+                const val = parseFloat(displayScore);
+                if (!isNaN(val)) score = val * 10;
+            } else {
+                displayScore = (score / 10).toFixed(1);
+            }
             
-            progress.style.backgroundColor = color;
-            progress.style.width = '0%';
-            setTimeout(() => { progress.style.width = score + '%'; }, 100);
+            gaugeValueEl.innerText = displayScore;
+
+            // Determine color based on score thresholds
+            let colorHex = "#ef4444"; // Red
+            if (score >= 40) colorHex = "#eab308"; // Yellow
+            if (score >= 70) colorHex = "#10b981"; // Green
+            
+            // Apply color
+            circle.style.color = colorHex;
+
+            // Animate offset
+            // dashoffset = circumference - (percent * circumference)
+            const offset = circumference - (score / 100) * circumference;
+            setTimeout(() => { 
+                circle.style.strokeDashoffset = offset;
+            }, 50);
 
             insightsList.innerHTML = (res.insights || []).map(i => `
                 <div class="insight-card ${i.type === 'positive' ? 'positive' : 'negative'}">
